@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8" />
+  <title>Монгол 13 Хөзөр - Demo</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background:#f7f7f7; }
+    .table { display:flex; gap:20px; flex-wrap:wrap; }
+    .player { background:white; padding:10px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,.1); width: 230px;}
+    .player h3 { margin:0 0 8px; font-size:16px; }
+    .hand { display:flex; flex-wrap:wrap; gap:6px; }
+    .card { width:46px; height:64px; border-radius:6px; background:#fff; border:1px solid #ddd; display:flex; align-items:center; justify-content:center; font-weight:600; font-size:12px; }
+    button { margin-top:10px; padding:8px 12px; border:none; background:#2d8cff; color:white; border-radius:6px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <h1>Монгол 13 Хөзөр — Тардаг demo</h1>
+  <div>
+    <button id="shuffleBtn">Шахаж тарих</button>
+  </div>
+
+  <div class="table" id="table"></div>
+
+  <script>
+    // Картын загвар: 52 карт (♠ ♥ ♦ ♣)
+    const suits = ['♠','♥','♦','♣'];
+    const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+    function createDeck(){
+      const deck = [];
+      for(const s of suits){
+        for(const r of ranks){
+          deck.push({suit: s, rank: r, code: r + s});
+        }
+      }
+      return deck;
+    }
+
+    function shuffle(array){
+      for(let i = array.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    // Тоглогчид
+    const players = [
+      { name: 'Та', hand: [] },
+      { name: 'CPU 1', hand: [] },
+      { name: 'CPU 2', hand: [] },
+      { name: 'CPU 3', hand: [] }
+    ];
+
+    const tableEl = document.getElementById('table');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+
+    function renderHands(){
+      tableEl.innerHTML = '';
+      players.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'player';
+        const h = document.createElement('h3');
+        h.textContent = `${p.name} (${p.hand.length})`;
+        div.appendChild(h);
+
+        const handDiv = document.createElement('div');
+        handDiv.className = 'hand';
+        p.hand.forEach(card => {
+          const c = document.createElement('div');
+          c.className = 'card';
+          c.textContent = card.code;
+          // Player only: click to reveal/select (for demo)
+          if(p.name === 'Та'){
+            c.style.cursor = 'pointer';
+            c.onclick = () => {
+              c.style.background = c.style.background === 'yellow' ? '#fff' : 'yellow';
+            }
+          }
+          handDiv.appendChild(c);
+        });
+
+        div.appendChild(handDiv);
+        tableEl.appendChild(div);
+      })
+    }
+
+    function deal(){
+      const deck = shuffle(createDeck());
+      // clear hands
+      players.forEach(p => p.hand = []);
+      // тараах: 13 ширхэг бүрт
+      for(let i = 0; i < 13; i++){
+        for(let j = 0; j < players.length; j++){
+          players[j].hand.push(deck.pop());
+        }
+      }
+      renderHands();
+    }
+
+    shuffleBtn.addEventListener('click', deal);
+
+    // анх deal хийж харуулах
+    deal();
+  </script>
+</body>
+</html>

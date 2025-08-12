@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8" />
+  <title>2 минутын Quiz — 10 асуулт</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--accent:#2b7cff;--muted:#666}
+    body{font-family:Inter, Arial, sans-serif;background:#f3f6fc;margin:0;padding:20px;display:flex;justify-content:center}
+    .card{width:100%;max-width:900px;background:#fff;border-radius:10px;box-shadow:0 6px 20px rgba(30,40,80,.08);padding:20px}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    h1{font-size:20px;margin:0}
+    .timer{font-weight:700;color:var(--accent)}
+    .progress{margin:6px 0;color:var(--muted)}
+    .question-box{padding:14px;border-radius:8px;border:1px solid #eef2ff;background:#fbfdff}
+    .qtext{font-weight:600;margin-bottom:10px}
+    .choices{display:flex;flex-direction:column;gap:8px}
+    .choice{padding:10px;border-radius:8px;border:1px solid #e6e9f2;cursor:pointer;display:flex;align-items:center;gap:8px}
+    .choice.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .controls{display:flex;gap:10px;justify-content:space-between;margin-top:14px}
+    button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    button.ghost{background:#eef2ff;color:var(--accent)}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .result{padding:14px;border-radius:8px;margin-top:14px;background:#fff6f6;border:1px solid #ffdede;color:#b32b2b}
+    .summary{margin-top:14px}
+    .incorrect-list{margin-top:12px;border-top:1px dashed #eee;padding-top:12px}
+    .incorrect-item{padding:10px;border-radius:8px;border:1px solid #f0f0f0;background:#fff;margin-bottom:8px}
+    .small{font-size:13px;color:var(--muted)}
+    .footer {margin-top:16px;text-align:right}
+    @media (max-width:600px){.card{padding:12px}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <header>
+      <h1>2 минутын Quiz — 10 асуулт</h1>
+      <div>
+        <div class="timer" id="timer">02:00</div>
+        <div class="small progress" id="progress">Асуулт 1 / 10</div>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Questions will render here -->
+    </main>
+
+    <div class="footer">
+      <button id="prevBtn" class="ghost">Prev</button>
+      <button id="nextBtn">Next</button>
+      <button id="submitBtn" style="background:#0b9d58">Submit</button>
+    </div>
+  </div>
+
+  <script>
+    // ---------- QUESTIONS (өөрчлөх боломжтой) ----------
+    // Each question: text, choices array, answer is index (0..3)
+    const QUESTIONS = [
+      { text: "Эх дэлхийн хамгийн их далайн гүн (мэдээж) юу вэ?", choices: ["Мариануудын хонхор","Каньон","Атлантын нуугдмал","Индонезийн далай"], answer: 0 },
+      { text: "Монгол улсын нийслэл ямар хот вэ?", choices: ["Улаанбаатар","Эрдэнэт","Дархан","Ховд"], answer: 0 },
+      { text: "Нэг цаг хэдэн минуттай тэнцэх вэ?", choices: ["30","60","90","120"], answer: 1 },
+      { text: "JavaScript-д массивыг хэрхэн тунхаглана?", choices: ["{}", "[]", "()", "<>"], answer: 1 },
+      { text: "Налайхын хотоос хамгийн ойр орших нь?", choices: ["Улаанбаатар", "Дархан", "Эрдэнэт", "Мөрөн"], answer: 0 },
+      { text: "Эдгээрээс аль нь сүүн бүтээгдэхүүн биш вэ?", choices: ["Тараг","Бяслаг","Шоколад","Сүү"], answer: 2 },
+      { text: "Монголын үндсэн хэл аль вэ?", choices: ["Монгол","Орос","Хятад","Англи"], answer: 0 },
+      { text: "Аль нь програмчлалын хэл вэ?", choices: ["HTML","CSS","Python","SQL (зөвхөн өгөгдлийн хэл)"], answer: 2 },
+      { text: "Усан дээр хатуу биет нь ямар байдалтай байна?", choices: ["Түгшүүртэй","Давхарлаг","Тоноглог","Жинхэнэ"], answer: 1 },
+      { text: "Сар огтлолцох явдал юуны үр дүн вэ?", choices: ["Үүл ихсэх","Сарны гэрэл алга болох","Сар ба Наадам","Хур бороо"], answer: 1 }
+    ];
+
+    // ---------- State ----------
+    const TOTAL_SECONDS = 120;
+    let timeLeft = TOTAL_SECONDS;
+    let timerInterval = null;
+
+    let currentIndex = 0;
+    const userAnswers = new Array(QUESTIONS.length).fill(null); // store selected index or null
+    let submitted = false;
+
+    // ---------- DOM ----------
+    const main = document.getElementById('main');
+    const timerEl = document.getElementById('timer');
+    const progressEl = document.getElementById('progress');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // ---------- Render one question ----------
+    function renderQuestion(idx){
+      const q = QUESTIONS[idx];
+      progressEl.textContent = `Асуулт ${idx+1} / ${QUESTIONS.length}`;
+      main.innerHTML = '';
+
+      const container = document.createElement('div');
+      container.className = 'question-box';
+
+      const qtext = document.createElement('div');
+      qtext.className = 'qtext';
+      qtext.textContent = q.text;
+      container.appendChild(qtext);
+
+      const choices = document.createElement('div');
+      choices.className = 'choices';
+
+      q.choices.forEach((c, i) => {
+        const ch = document.createElement('div');
+        ch.className = 'choice';
+        if(userAnswers[idx] === i) ch.classList.add('selected');
+        ch.innerHTML = `<span style="width:20px;text-align:center;font-weight:700">${String.fromCharCode(65+i)}.</span><div>${c}</div>`;
+        ch.onclick = () => {
+          if(submitted) return; // no change after submit (except review mode)
+          userAnswers[idx] = i;
+          // re-render choices to update selected class
+          renderQuestion(idx);
+        };
+        choices.appendChild(ch);
+      });
+
+      container.appendChild(choices);
+      // small hint
+      const hint = document.createElement('div');
+      hint.className = 'small';
+      hint.style.marginTop = '8px';
+      hint.textContent = submitted ? '' : 'Сонголтоо хийхийн тулд дээр нь дарна уу.';
+      container.appendChild(hint);
+
+      main.appendChild(container);
+    }
+
+    // ---------- Timer ----------
+    function startTimer(){
+      updateTimerDisplay();
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+        if(timeLeft <= 0){
+          clearInterval(timerInterval);
+          autoSubmit();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay(){
+      const mm = String(Math.floor(timeLeft / 60)).padStart(2,'0');
+      const ss = String(timeLeft % 60).padStart(2,'0');
+      timerEl.textContent = `${mm}:${ss}`;
+    }
+
+    // ---------- Navigation ----------
+    prevBtn.onclick = () => {
+      if(currentIndex > 0) currentIndex--;
+      renderQuestion(currentIndex);
+    };
+    nextBtn.onclick = () => {
+      if(currentIndex < QUESTIONS.length - 1) currentIndex++;
+      renderQuestion(currentIndex);
+    };
+
+    // ---------- Submit ----------
+    submitBtn.onclick = () => {
+      if(confirm('Шилэн: Та хариултаа илгээх гэж байна. Баталгаажуулна уу?')) doSubmit();
+    };
+
+    function autoSubmit(){
+      alert('Хугацаа дууслаа — Хариултууд автоматаар илгээгдлээ.');
+      doSubmit();
+    }
+
+    function doSubmit(){
+      if(submitted) return;
+      submitted = true;
+      clearInterval(timerInterval);
+
+      // compute score
+      let score = 0;
+      const wrongs = [];
+      QUESTIONS.forEach((q, i) => {
+        if(userAnswers[i] === q.answer) score++;
+        else wrongs.push(i);
+      });
+
+      // Render results
+      main.innerHTML = '';
+
+      const res = document.createElement('div');
+      res.className = 'result';
+      res.innerHTML = `<strong>Таны оноо:</strong> ${score} / ${QUESTIONS.length} <br><small class="small">Зөв: ${score}, Буруу: ${QUESTIONS.length - score}</small>`;
+      main.appendChild(res);
+
+      const summary = document.createElement('div');
+      summary.className = 'summary';
+      summary.innerHTML = `<p class="small">Доор буруу хариултуудын жагсаалт байна. Та засаж, "Rescore wrong" товчоор оноогоо дахин бодож болно.</p>`;
+      main.appendChild(summary);
+
+      // incorrect list
+      const list = document.createElement('div');
+      list.className = 'incorrect-list';
+      if(wrongs.length === 0){
+        list.innerHTML = '<div class="small">Та бүх асуултад зөв хариулсан байна. Мундаг!</div>';
+      } else {
+        wrongs.forEach(i => {
+          const item = document.createElement('div');
+          item.className = 'incorrect-item';
+          const q = QUESTIONS[i];
+          const your = userAnswers[i] == null ? 'Хариулт өгөөгүй' : `${String.fromCharCode(65+userAnswers[i])}. ${q.choices[userAnswers[i]]}`;
+          const correct = `${String.fromCharCode(65+q.answer)}. ${q.choices[q.answer]}`;
+
+          item.innerHTML = `<div style="font-weight:600">${i+1}. ${q.text}</div>
+            <div class="small">Таны хариулт: <strong>${your}</strong></div>
+            <div class="small">Зөв хариулт: <strong>${correct}</strong></div>
+            <div style="margin-top:8px">
+              <button class="ghost" data-idx="${i}" style="margin-right:8px">Edit answer</button>
+            </div>`;
+          list.appendChild(item);
+        });
+      }
+      main.appendChild(list);
+
+      // buttons: rescore wrong & restart
+      const actions = document.createElement('div');
+      actions.style.marginTop = '12px';
+      actions.innerHTML = `
+        <button id="rescoreBtn">Rescore wrong</button>
+        <button id="restartBtn" class="ghost">Restart quiz</button>
+      `;
+      main.appendChild(actions);
+
+      // attach listeners
+      document.getElementById('rescoreBtn').onclick = () => {
+        // switch to review mode — allow editing wrong answers only
+        reviewWrongMode();
+      };
+      document.getElementById('restartBtn').onclick = () => {
+        if(confirm('Дахин эхлэх үү? Таны одоогийн хариултууд устаж шинэ эхэлнэ.')){
+          resetQuiz();
+        }
+      };
+
+      // edit answer buttons
+      list.querySelectorAll('button[data-idx]').forEach(btn => {
+        btn.onclick = (e) => {
+          const idx = Number(btn.dataset.idx);
+          currentIndex = idx;
+          // go into review editing mode (we'll allow edits even after submit)
+          submitted = false;
+          // stop timer just in case
+          clearInterval(timerInterval);
+          renderQuestion(idx);
+          window.scrollTo({top:0,behavior:'smooth'});
+        }
+      });
+
+      // disable navigation and hide submit
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
+      submitBtn.disabled = true;
+    }
+
+    // ---------- Review wrong mode ----------
+    function reviewWrongMode(){
+      // Allow editing only on incorrect questions:
+      // We'll present each wrong question sequentially and after change they can press "Save & Next"
+      // For simplicity allow editing any question but only wrongs are needed to change
+      submitted = false; // allow changing
+      // gather wrong indices
+      const wrongIndices = QUESTIONS.map((q,i)=> i).filter(i => userAnswers[i] !== QUESTIONS[i].answer);
+      if(wrongIndices.length === 0){
+        alert('Буруу хариулт байхгүй тул review шаардлагагүй.');
+        return;
+      }
+      // start at first wrong
+      let wi = 0;
+      function showWrong(){
+        const idx = wrongIndices[wi];
+        renderQuestion(idx);
+        // add save/next UI
+        const saveNext = document.createElement('div');
+        saveNext.style.marginTop = '12px';
+        saveNext.innerHTML = `<button id="saveNext" style="margin-right:8px">Save & Next</button>
+                              <button id="skip" class="ghost">Skip</button>
+                              <button id="finish" class="ghost">Finish Review</button>`;
+        main.appendChild(saveNext);
+        document.getElementById('saveNext').onclick = () => {
+          // ensure selection exists
+          if(userAnswers[idx] == null){
+            if(!confirm('Та хариултаа оруулсангүй. Үүнийг дамжуулах уу?')) return;
+          }
+          wi++;
+          if(wi >= wrongIndices.length){
+            // finished review
+            finalizeRescore();
+          } else {
+            showWrong();
+          }
+        };
+        document.getElementById('skip').onclick = () => {
+          wi++;
+          if(wi >= wrongIndices.length) finalizeRescore();
+          else showWrong();
+        };
+        document.getElementById('finish').onclick = () => {
+          finalizeRescore();
+        };
+      }
+      showWrong();
+    }
+
+    function finalizeRescore(){
+      // re-run scoring but allow immediate display
+      submitted = true;
+      // compute new score and render result again
+      doRescoreAndShow();
+    }
+
+    function doRescoreAndShow(){
+      // compute
+      let score = 0;
+      const wrongs = [];
+      QUESTIONS.forEach((q, i) => {
+        if(userAnswers[i] === q.answer) score++;
+        else wrongs.push(i);
+      });
+
+      // show a simple alert and re-render result
+      alert(`Шинэ оноо: ${score} / ${QUESTIONS.length}`);
+      // render same result UI as doSubmit
+      submitted = true;
+      // re-enable prev/next disabled state
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
+      submitBtn.disabled = true;
+      main.innerHTML = '';
+      const res = document.createElement('div');
+      res.className = 'result';
+      res.innerHTML = `<strong>Таны шинэ оноо:</strong> ${score} / ${QUESTIONS.length} <br><small class="small">Зөв: ${score}, Буруу: ${QUESTIONS.length - score}</small>`;
+      main.appendChild(res);
+
+      const list = document.createElement('div');
+      list.className = 'incorrect-list';
+      if(wrongs.length === 0){
+        list.innerHTML = '<div class="small">Та бүх асуултад зөв хариулсан байна. Мундаг!</div>';
+      } else {
+        wrongs.forEach(i => {
+          const item = document.createElement('div');
+          item.className = 'incorrect-item';
+          const q = QUESTIONS[i];
+          const your = userAnswers[i] == null ? 'Хариулт өгөөгүй' : `${String.fromCharCode(65+userAnswers[i])}. ${q.choices[userAnswers[i]]}`;
+          const correct = `${String.fromCharCode(65+q.answer)}. ${q.choices[q.answer]}`;
+          item.innerHTML = `<div style="font-weight:600">${i+1}. ${q.text}</div>
+            <div class="small">Таны хариулт: <strong>${your}</strong></div>
+            <div class="small">Зөв хариулт: <strong>${correct}</strong></div>`;
+          list.appendChild(item);
+        });
+      }
+      main.appendChild(list);
+
+      const actions = document.createElement('div');
+      actions.style.marginTop = '12px';
+      actions.innerHTML = `
+        <button id="restartBtn2" class="ghost">Restart quiz</button>
+      `;
+      main.appendChild(actions);
+      document.getElementById('restartBtn2').onclick = resetQuiz;
+    }
+
+    // ---------- Reset ----------
+    function resetQuiz(){
+      clearInterval(timerInterval);
+      timeLeft = TOTAL_SECONDS;
+      userAnswers.fill(null);
+      currentIndex = 0;
+      submitted = false;
+      prevBtn.disabled = false;
+      nextBtn.disabled = false;
+      submitBtn.disabled = false;
+      renderQuestion(0);
+      startTimer();
+    }
+
+    // ---------- init ----------
+    renderQuestion(0);
+    startTimer();
+  </script>
+</body>
+</html>
