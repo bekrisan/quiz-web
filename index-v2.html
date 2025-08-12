@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8" />
+  <title>2 минутын Quiz — Тоололтой</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--accent:#2b7cff;--muted:#666;--bg:#f5f7fb}
+    body{margin:0;background:var(--bg);font-family:Inter,Arial,sans-serif}
+    .container{width:100%;max-width:900px;margin:auto;padding:20px}
+    .start-screen, .quiz-screen{background:#fff;padding:30px;border-radius:12px;box-shadow:0 8px 30px rgba(20,30,80,.08);text-align:center}
+    h1{margin:0 0 16px;font-size:22px}
+    .btn{display:inline-block;padding:12px 20px;background:var(--accent);color:#fff;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+    .btn:disabled{opacity:.6;cursor:not-allowed}
+    .countdown{font-size:96px;font-weight:800;color:var(--accent);margin:24px 0;height:120px;display:flex;align-items:center;justify-content:center}
+    .small{color:#666}
+    .hidden{display:none}
+    .fade-in{animation:fade .35s ease both}
+    @keyframes fade{from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)}}
+
+    /* quiz styles from index.html */
+    .card{width:100%;background:#fff;border-radius:10px;box-shadow:0 6px 20px rgba(30,40,80,.08);padding:20px;text-align:left}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    header h1{font-size:20px;margin:0}
+    .timer{font-weight:700;color:var(--accent)}
+    .progress{margin:6px 0;color:var(--muted)}
+    .question-box{padding:14px;border-radius:8px;border:1px solid #eef2ff;background:#fbfdff}
+    .qtext{font-weight:600;margin-bottom:10px}
+    .choices{display:flex;flex-direction:column;gap:8px}
+    .choice{padding:10px;border-radius:8px;border:1px solid #e6e9f2;cursor:pointer;display:flex;align-items:center;gap:8px}
+    .choice.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .controls{display:flex;gap:10px;justify-content:space-between;margin-top:14px}
+    button{padding:8px 12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    button.ghost{background:#eef2ff;color:var(--accent)}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .result{padding:14px;border-radius:8px;margin-top:14px;background:#fff6f6;border:1px solid #ffdede;color:#b32b2b}
+    .summary{margin-top:14px}
+    .incorrect-list{margin-top:12px;border-top:1px dashed #eee;padding-top:12px}
+    .incorrect-item{padding:10px;border-radius:8px;border:1px solid #f0f0f0;background:#fff;margin-bottom:8px}
+    .footer {margin-top:16px;text-align:right}
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Start screen -->
+  <div id="startScreen" class="start-screen">
+    <h1>Сайн байна уу!</h1>
+    <h1> Ерөнхий мэдлэгийн богино <br>асуултын вэб-д тавтай морилно уу!</h1>
+    <br>
+    <div class="small">Товч дарангуут 1 → 2 → 3 тоолно. Тоолол дуусмагц quiz эхэлнэ.</div>
+    <div id="countdown" class="countdown"></div>
+    <div style="margin-top:18px">
+      <button id="startBtn" class="btn">Эхлэе</button>
+      <button id="skipBtn" class="btn" style="background:#6c757d;margin-left:8px">Skip</button>
+    </div>
+  </div>
+
+  <!-- Quiz screen -->
+  <div id="quizScreen" class="quiz-screen hidden">
+    <div class="card">
+      <header>
+        <h1>2 минутын Quiz — 10 асуулт</h1>
+        <div>
+          <div class="timer" id="timer">02:00</div>
+          <div class="small progress" id="progress">Асуулт 1 / 10</div>
+        </div>
+      </header>
+      <main id="main"></main>
+      <div class="footer">
+        <button id="prevBtn" class="ghost">Prev</button>
+        <button id="nextBtn">Next</button>
+        <button id="submitBtn" style="background:#0b9d58">Submit</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* --- Start screen countdown --- */
+const startBtn=document.getElementById('startBtn'),
+      skipBtn=document.getElementById('skipBtn'),
+      countdownEl=document.getElementById('countdown'),
+      startScreen=document.getElementById('startScreen'),
+      quizScreen=document.getElementById('quizScreen');
+
+let countdownTimer=null;
+const sequence=[1,2,3];
+
+startBtn.onclick=()=>{startBtn.disabled=true;skipBtn.disabled=true;runCountSequence(sequence,800).then(startQuiz)};
+skipBtn.onclick=()=>startQuiz();
+
+function runCountSequence(arr,delay=700){
+  return new Promise(res=>{
+    let i=0;showNumber(arr[i++]);
+    countdownTimer=setInterval(()=>{
+      if(i>=arr.length){
+        clearInterval(countdownTimer);
+        showText('GO!');
+        setTimeout(()=>{countdownEl.textContent='';res();},500);
+      } else showNumber(arr[i++]);
+    },delay);
+  });
+}
+function showNumber(n){countdownEl.classList.remove('fade-in');void countdownEl.offsetWidth;countdownEl.textContent=n;countdownEl.classList.add('fade-in')}
+function showText(t){countdownEl.classList.remove('fade-in');void countdownEl.offsetWidth;countdownEl.textContent=t;countdownEl.classList.add('fade-in')}
+
+function startQuiz(){
+  startScreen.classList.add('hidden');
+  quizScreen.classList.remove('hidden');
+  initQuiz();
+}
+
+/* --- Quiz logic from index.html --- */
+const QUESTIONS=[
+  { text:"Эх дэлхийн хамгийн их далайн гүн юу вэ?",choices:["Мариануудын хонхор","Каньон","Атлантын нуугдмал","Индонезийн далай"],answer:0 },
+  { text:"Монголын хамгийн өмнө цэг юу вэ?",choices:["Монгол шарын даваа","Орвог гашууны бор толгой","Алтайн нурууны Мааньт уул","Соёлз уулын модот хамар"],answer:0 },
+  { text:"Дэлхийн хамгийн урт мөрөн юу вэ?",choices:["Амазон","Нил","Миссисипи","Янцзы"],answer:1 },
+  { text:"Дэлхийн хамгийн өндөр уул юу вэ?",choices:["Эверест","К2","Канченжунга","Лхотсе"],answer:0 },
+  { text:"Дэлхийн хамгийн олон араб хэлтэй улс юу вэ?",choices:["Египет","Саудын Араб","Ирак","Сири"],answer:1 },
+  { text:"Монголын хамгийн өндөр уул юу вэ?",choices:["Баянзүрх","Хүйтэн уул","Бурхан халдун","Наран уул"],answer:2 },
+  { text:"Монголын хамгийн том нуур юу вэ?",choices:["Хөвсгөл нуур","Буйр нуур","Өвөрхангай нуур","Тэрхийн цагаан нуур"],answer:0 },
+  { text:"Монголын хамгийн урт гол юу вэ?",choices:["Орхон гол","Сэлэнгэ гол","Халх гол","Туул гол"],answer:1 },
+  { text:"Монголын хамгийн их хүн амтай аймаг юу вэ?",choices:["Улаанбаатар","Дархан-Уул","Орхон","Говьсүмбэр"],answer:0 },
+  { text:"Монголын хамгийн олон соёлтой аймаг юу вэ?",choices:["Сүхбаатар","Дорноговь","Өвөрхангай","Булган"],answer:2 },
+  // ... бусад асуултууд энд ...
+];
+
+const TOTAL_SECONDS=120;
+let timeLeft=TOTAL_SECONDS,timerInterval=null;
+let currentIndex=0;
+const userAnswers=new Array(QUESTIONS.length).fill(null);
+let submitted=false;
+
+const main=document.getElementById('main'),
+      timerEl=document.getElementById('timer'),
+      progressEl=document.getElementById('progress'),
+      prevBtn=document.getElementById('prevBtn'),
+      nextBtn=document.getElementById('nextBtn'),
+      submitBtn=document.getElementById('submitBtn');
+
+function initQuiz(){
+  renderQuestion(0);
+  startTimer();
+}
+function renderQuestion(idx){
+  const q=QUESTIONS[idx];
+  progressEl.textContent=`Асуулт ${idx+1} / ${QUESTIONS.length}`;
+  main.innerHTML='';
+  const box=document.createElement('div');
+  box.className='question-box';
+  const qtext=document.createElement('div');
+  qtext.className='qtext';qtext.textContent=q.text;
+  box.appendChild(qtext);
+  const chs=document.createElement('div');
+  chs.className='choices';
+  q.choices.forEach((c,i)=>{
+    const el=document.createElement('div');
+    el.className='choice'; if(userAnswers[idx]===i) el.classList.add('selected');
+    el.innerHTML=`<span style="width:20px;text-align:center;font-weight:700">${String.fromCharCode(65+i)}.</span><div>${c}</div>`;
+    el.onclick=()=>{if(submitted)return;userAnswers[idx]=i;renderQuestion(idx);};
+    chs.appendChild(el);
+  });
+  box.appendChild(chs);
+  main.appendChild(box);
+}
+function startTimer(){
+  updateTimer();timerInterval=setInterval(()=>{timeLeft--;updateTimer();if(timeLeft<=0){clearInterval(timerInterval);autoSubmit();}},1000);
+}
+function updateTimer(){
+  timerEl.textContent=`${String(Math.floor(timeLeft/60)).padStart(2,'0')}:${String(timeLeft%60).padStart(2,'0')}`;
+}
+prevBtn.onclick=()=>{if(currentIndex>0) currentIndex--;renderQuestion(currentIndex)};
+nextBtn.onclick=()=>{if(currentIndex<QUESTIONS.length-1) currentIndex++;renderQuestion(currentIndex)};
+submitBtn.onclick=()=>{if(confirm('Илгээх үү?'))doSubmit()};
+function autoSubmit(){alert('Хугацаа дууслаа');doSubmit();}
+function doSubmit(){
+  if(submitted)return;submitted=true;clearInterval(timerInterval);
+  let score=0;
+  const incorrect = [];
+  QUESTIONS.forEach((q,i)=>{
+    if(userAnswers[i]===q.answer) {
+      score++;
+    } else {
+      incorrect.push({
+        idx: i,
+        question: q.text,
+        user: userAnswers[i] !== null ? q.choices[userAnswers[i]] : "Хариу өгөөгүй",
+        correct: q.choices[q.answer]
+      });
+    }
+  });
+  let html = `<div class="result"><strong>Таны оноо:</strong> ${score} / ${QUESTIONS.length}</div>`;
+  if(incorrect.length > 0) {
+    html += `<div class="summary"><strong>Буруу хариулсан асуултууд:</strong></div>`;
+    html += `<div class="incorrect-list">`;
+    incorrect.forEach(item => {
+      html += `<div class="incorrect-item">
+        <div><strong>Асуулт ${item.idx+1}:</strong> ${item.question}</div>
+        <div>Таны хариулт: <span style="color:#b32b2b">${item.user}</span></div>
+        <div>Зөв хариулт: <span style="color:#0b9d58">${item.correct}</span></div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  // Add Reset and Share buttons
+  html += `
+    <div style="margin-top:18px;display:flex;gap:10px;justify-content:center">
+      <button id="resetBtn" style="background:#2b7cff">Дахин эхлэх</button>
+      <a id="fbShare" class="btn" style="background:#4267B2;text-decoration:none" target="_blank">Facebook-д хуваалцах</a>
+      <a id="igShare" class="btn" style="background:#E1306C;text-decoration:none" target="_blank">Instagram-д хуваалцах</a>
+    </div>
+  `;
+  main.innerHTML = html;
+
+  // Hide navigation and submit buttons
+  prevBtn.style.display = "none";
+  nextBtn.style.display = "none";
+  submitBtn.style.display = "none";
+
+  // Reset button event
+  document.getElementById('resetBtn').onclick = () => {
+    // Reset all state
+    submitted = false;
+    timeLeft = TOTAL_SECONDS;
+    for(let i=0;i<userAnswers.length;i++) userAnswers[i]=null;
+    currentIndex = 0;
+    // Show navigation and submit buttons again
+    prevBtn.style.display = "";
+    nextBtn.style.display = "";
+    submitBtn.style.display = "";
+    startQuiz();
+  };
+
+  // Facebook share link
+  const fbShare = document.getElementById('fbShare');
+  const shareText = encodeURIComponent(`Би ${score} / ${QUESTIONS.length} оноо авлаа! Та ч бас туршаад үзээрэй!`);
+  const shareUrl = encodeURIComponent(window.location.href);
+  fbShare.href = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`;
+
+  // Instagram share link (Instagram does not support direct web sharing, so we suggest copy text)
+  const igShare = document.getElementById('igShare');
+  igShare.onclick = (e) => {
+    e.preventDefault();
+    navigator.clipboard.writeText(`Би ${score} / ${QUESTIONS.length} оноо авлаа! Та ч бас туршаад үзээрэй! ${window.location.href}`);
+    alert("Таны оноог хууллаа. Instagram story/пост дээрээ paste хийгээрэй!");
+  };
+}
+</script>
+</body>
+</html>
